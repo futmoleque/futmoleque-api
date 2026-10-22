@@ -54,6 +54,15 @@ Exemplos:
 | Na main (regra `main-basico`, vale para todos) | Ninguém apaga a main, ninguém faz force push, histórico linear |
 | Na main (regra `main-pr`) | PR com 1 aprovação e check **Validar PR**. Repository admin tem exceção (pode enviar direto) |
 
+## Integração com o Jira
+
+Os dois repositórios estão ligados ao Jira (futmoleque.atlassian.net) pelo app **GitHub for Atlassian**, instalado na organização `futmoleque`.
+
+- Todo commit com a chave do card (`SCRUM-123`, em maiúsculas, como o hook já exige) aparece na aba **Desenvolvimento** desse card logo depois do `git salvar`.
+- Branches e PRs também aparecem quando a chave estiver no nome da branch ou no título do PR (fluxo do 2º dev).
+- Commits enviados para a main antes da integração não aparecem: o histórico importado pelo app não inclui a branch principal.
+- Smart commits (`#comment`, `#time`, `#done`) estão ligados no Jira, mas não fazem efeito aqui: os commits usam o e-mail noreply do GitHub, e o Jira só executa o comando quando o e-mail do commit é o mesmo do login no Jira. Mova o card e lance horas no próprio Jira.
+
 ## Quando o 2º dev entrar: fluxo com PR
 
 1. Nos dois repositórios, em Settings › Rules › Rulesets › `main-pr`, troque a exceção do Repository admin de **Always allow** para **For pull requests only** (ou remova). O 2º dev entra com papel **Write**, nunca Admin.
@@ -61,4 +70,5 @@ Exemplos:
    - Branch: `tipo/SCRUM-123-descricao-curta` (`feature/`, `fix/`, `hotfix/`, `chore/`, `docs/`, `refactor/`, `test/`), minúsculo, com hífens, sem acento.
    - Título do PR: `tipo: SCRUM-123 descrição`, com a mesma chave da branch. Ele vira o commit na main (squash).
    - O check **Validar PR** confere branch e título; o PR precisa de 1 aprovação; merge só por **Squash and merge**.
+   - Com a chave na branch e no título, a branch e o PR aparecem sozinhos na aba **Desenvolvimento** do card.
 3. O `git salvar` passa a recusar quem não estiver na main; troque-o pelo fluxo de branch.

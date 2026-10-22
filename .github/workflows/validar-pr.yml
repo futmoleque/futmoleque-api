@@ -1,0 +1,56 @@
+# Validar PR
+# Confere o nome da branch e o título do PR (Conventional Commits + chave do Jira).
+# É o check obrigatório "Validar PR" da regra main-protecao.
+# Não usa actions de terceiros, então não há versão de action para atualizar.
+
+name: Validar PR
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened]
+
+permissions: {}
+
+jobs:
+  validar:
+    name: Validar PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Conferir branch e título
+        env:
+          CHAVE: SCRUM
+          BRANCH: ${{ github.head_ref }}
+          TITULO: ${{ github.event.pull_request.title }}
+        run: |
+          tipos_branch='feature|fix|hotfix|chore|docs|refactor|test'
+          tipos_titulo='feat|fix|chore|docs|refactor|test|style|perf|build|ci|revert'
+          re_branch="^(${tipos_branch})/${CHAVE}-[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$"
+          re_titulo="^(${tipos_titulo})(\([a-z0-9-]+\))?!?: ${CHAVE}-[0-9]+ .+"
+          erro=0
+
+          echo "Branch: $BRANCH"
+          echo "Título: $TITULO"
+
+          if [[ ! "$BRANCH" =~ $re_branch ]]; then
+            echo "::error title=Branch fora do padrão::Use tipo/${CHAVE}-123-descricao-curta (minúsculo, com hífens, sem acento). Tipos: ${tipos_branch//|/ }"
+            erro=1
+          fi
+
+          if [[ ! "$TITULO" =~ $re_titulo ]]; then
+            echo "::error title=Título fora do padrão::Use tipo: ${CHAVE}-123 descrição (ou tipo(escopo): ${CHAVE}-123 descrição). Tipos: ${tipos_titulo//|/ }"
+            erro=1
+          fi
+
+          chave_branch=$(grep -oE "${CHAVE}-[0-9]+" <<< "$BRANCH" | head -n 1 || true)
+          chave_titulo=$(grep -oE "${CHAVE}-[0-9]+" <<< "$TITULO" | head -n 1 || true)
+          if [[ $erro -eq 0 && "$chave_branch" != "$chave_titulo" ]]; then
+            echo "::error title=Chaves diferentes::A branch é do ${chave_branch} e o título é do ${chave_titulo}. Use a chave do mesmo card nos dois."
+            erro=1
+          fi
+
+          if [[ $erro -eq 0 ]]; then
+            echo "Tudo certo: branch e título no padrão, mesma chave (${chave_branch})."
+          fi
+          exit $erro

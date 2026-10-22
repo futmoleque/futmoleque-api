@@ -1,0 +1,33 @@
+#!/bin/sh
+# Hook commit-msg do FutMoleque: confere a mensagem antes de criar o commit.
+# Padrão: tipo: SCRUM-123 descrição   (ou tipo(escopo): SCRUM-123 descrição)
+# Ativar uma vez em cada clone:   git config core.hooksPath .githooks
+
+CHAVE="SCRUM"
+TIPOS="feat|fix|chore|docs|refactor|test|style|perf|build|ci|revert"
+
+# Primeira linha que não é comentário nem está vazia
+TITULO=$(sed -e 's/\r$//' "$1" | grep -v '^#' | grep -v '^[[:space:]]*$' | head -n 1)
+
+# Mensagens que o próprio Git gera passam direto
+case "$TITULO" in
+  "Merge "*|"Revert \""*|"fixup! "*|"squash! "*|"amend! "*) exit 0 ;;
+esac
+
+if printf '%s\n' "$TITULO" | grep -Eq "^($TIPOS)(\([a-z0-9-]+\))?!?: $CHAVE-[0-9]+ .+"; then
+  exit 0
+fi
+
+cat >&2 <<EOF
+
+  Commit recusado: mensagem fora do padrão.
+
+  Você escreveu:  $TITULO
+  Use:            tipo: $CHAVE-123 descrição
+  Exemplo:        feat: $CHAVE-45 cria tela de login
+
+  Tipos: feat, fix, chore, docs, refactor, test, style, perf, build, ci, revert
+  Nada foi perdido: corrija a mensagem e rode o git commit de novo.
+
+EOF
+exit 1

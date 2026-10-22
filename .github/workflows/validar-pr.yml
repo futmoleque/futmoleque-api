@@ -1,45 +1,52 @@
-# Validar PR
-# Confere o nome da branch e o título do PR (Conventional Commits + chave do Jira).
-# É o check obrigatório "Validar PR" da regra main-protecao.
+# Validar PR e Validar commits
+# - Validar PR: no PR, confere o nome da branch e o título (Conventional Commits + chave do Jira).
+#   É o check obrigatório "Validar PR" da regra main-pr.
+# - Validar commits: em todo push na main, confere a mensagem de cada commit enviado.
+#   Enquanto só 1 dev trabalha, os commits vão direto na main (git salvar) e este job é o aviso no GitHub.
 # Não usa actions de terceiros, então não há versão de action para atualizar.
 
-name: Validar PR
+name: Validar padrões
 
 on:
   pull_request:
     branches: [main]
     types: [opened, edited, synchronize, reopened]
+  push:
+    branches: [main]
 
 permissions: {}
+
+env:
+  CHAVE: SCRUM
+  TIPOS_TITULO: feat|fix|chore|docs|refactor|test|style|perf|build|ci|revert
+  TIPOS_BRANCH: feature|fix|hotfix|chore|docs|refactor|test
 
 jobs:
   validar:
     name: Validar PR
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
       - name: Conferir branch e título
         env:
-          CHAVE: SCRUM
           BRANCH: ${{ github.head_ref }}
           TITULO: ${{ github.event.pull_request.title }}
         run: |
-          tipos_branch='feature|fix|hotfix|chore|docs|refactor|test'
-          tipos_titulo='feat|fix|chore|docs|refactor|test|style|perf|build|ci|revert'
-          re_branch="^(${tipos_branch})/${CHAVE}-[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$"
-          re_titulo="^(${tipos_titulo})(\([a-z0-9-]+\))?!?: ${CHAVE}-[0-9]+ .+"
+          re_branch="^(${TIPOS_BRANCH})/${CHAVE}-[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$"
+          re_titulo="^(${TIPOS_TITULO})(\([a-z0-9-]+\))?!?: ${CHAVE}-[0-9]+ .+"
           erro=0
 
           echo "Branch: $BRANCH"
           echo "Título: $TITULO"
 
           if [[ ! "$BRANCH" =~ $re_branch ]]; then
-            echo "::error title=Branch fora do padrão::Use tipo/${CHAVE}-123-descricao-curta (minúsculo, com hífens, sem acento). Tipos: ${tipos_branch//|/ }"
+            echo "::error title=Branch fora do padrão::Use tipo/${CHAVE}-123-descricao-curta (minúsculo, com hífens, sem acento). Tipos: ${TIPOS_BRANCH//|/ }"
             erro=1
           fi
 
           if [[ ! "$TITULO" =~ $re_titulo ]]; then
-            echo "::error title=Título fora do padrão::Use tipo: ${CHAVE}-123 descrição (ou tipo(escopo): ${CHAVE}-123 descrição). Tipos: ${tipos_titulo//|/ }"
+            echo "::error title=Título fora do padrão::Use tipo: ${CHAVE}-123 descrição (ou tipo(escopo): ${CHAVE}-123 descrição). Tipos: ${TIPOS_TITULO//|/ }"
             erro=1
           fi
 
@@ -53,4 +60,30 @@ jobs:
           if [[ $erro -eq 0 ]]; then
             echo "Tudo certo: branch e título no padrão, mesma chave (${chave_branch})."
           fi
+          exit $erro
+
+  commits:
+    name: Validar commits
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Conferir a mensagem de cada commit enviado
+        env:
+          COMMITS: ${{ toJSON(github.event.commits) }}
+        run: |
+          re="^(${TIPOS_TITULO})(\([a-z0-9-]+\))?!?: ${CHAVE}-[0-9]+ .+"
+          erro=0
+          while IFS=$'\t' read -r id titulo; do
+            [[ -z "$id" ]] && continue
+            case "$titulo" in
+              "Merge "*|"Revert \""*) echo "ok   $id  $titulo (gerado pelo Git)"; continue ;;
+            esac
+            if [[ "$titulo" =~ $re ]]; then
+              echo "ok   $id  $titulo"
+            else
+              echo "::error title=Commit fora do padrão::$id  $titulo  ->  use tipo: ${CHAVE}-123 descrição"
+              erro=1
+            fi
+          done < <(jq -r '.[] | "\(.id[0:7])\t\(.message | split("\n")[0])"' <<< "$COMMITS")
           exit $erro

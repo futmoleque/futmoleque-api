@@ -16,3 +16,4 @@ git config core.hooksPath .githooks
 ## Histórico
 
 - Estrutura inicial e proteção da main (Sprint 0)
+- Main protegida e testada
